@@ -57,7 +57,10 @@ def sample_latents(
             model_kwargs[k] = torch.cat([v, torch.zeros_like(v)], dim=0)
 
     sample_shape = (batch_size, model.d_latent)
-    with torch.autocast(device_type=device.type, enabled=use_fp16):
+    
+    # Check if the device is MPS
+    if device.type == 'mps':
+        # For MPS, don't use autocast
         if use_karras:
             samples = karras_sample(
                 diffusion=diffusion,
@@ -86,5 +89,36 @@ def sample_latents(
                 clip_denoised=clip_denoised,
                 progress=progress,
             )
+    else:
+        # For other devices, use autocast as before
+        with torch.autocast(device_type=device.type, enabled=use_fp16):
+            if use_karras:
+                samples = karras_sample(
+                    diffusion=diffusion,
+                    model=model,
+                    shape=sample_shape,
+                    steps=karras_steps,
+                    clip_denoised=clip_denoised,
+                    model_kwargs=model_kwargs,
+                    device=device,
+                    sigma_min=sigma_min,
+                    sigma_max=sigma_max,
+                    s_churn=s_churn,
+                    guidance_scale=guidance_scale,
+                    progress=progress,
+                )
+            else:
+                internal_batch_size = batch_size
+                if guidance_scale != 1.0:
+                    model = uncond_guide_model(model, guidance_scale)
+                    internal_batch_size *= 2
+                samples = diffusion.p_sample_loop(
+                    model,
+                    shape=(internal_batch_size, *sample_shape[1:]),
+                    model_kwargs=model_kwargs,
+                    device=device,
+                    clip_denoised=clip_denoised,
+                    progress=progress,
+                )
 
     return samples

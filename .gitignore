@@ -1,3 +1,7 @@
 __pycache__/
 .DS_Store
 *.egg-info/
+/.venv
+/shap_e/shap_e_model_cache
+/shap_e/examples/shap_e_model_cache
+/shap_e_model_cache
